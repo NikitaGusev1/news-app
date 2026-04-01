@@ -58,7 +58,7 @@ def test_fetch_all_returns_successful_articles():
     assert len(results) == 2
 
 
-def test_fetch_all_skips_failed_urls(capsys):
+def test_fetch_all_skips_failed_urls():
     def fake_fetch(url):
         if "bad" in url:
             raise ValueError("Failed to fetch https://bad.com/a")
