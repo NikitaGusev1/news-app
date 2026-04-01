@@ -45,6 +45,11 @@ SECTION_HEADERS = [
 ]
 
 
+def build_prompt(articles: list[tuple[str, str]]) -> str:
+    parts = [f"--- SOURCE: {label} ---\n{text}" for label, text in articles]
+    return "\n\n".join(parts)
+
+
 def parse_args() -> list[str]:
     parser = argparse.ArgumentParser(
         description="Compare news coverage of the same story across multiple sources."
