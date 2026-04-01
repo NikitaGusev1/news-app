@@ -65,6 +65,20 @@ def fetch_all(urls: list[str]) -> list[tuple[str, str]]:
     return [results[url] for url in urls if url in results]
 
 
+def parse_sections(text: str) -> dict[str, str]:
+    sections: dict[str, str] = {}
+    for i, header in enumerate(SECTION_HEADERS):
+        start = text.find(header)
+        if start == -1:
+            sections[header] = ""
+            continue
+        start += len(header)
+        next_header = SECTION_HEADERS[i + 1] if i + 1 < len(SECTION_HEADERS) else None
+        end = text.find(next_header, start) if next_header else len(text)
+        sections[header] = text[start:end].strip()
+    return sections
+
+
 def parse_args() -> list[str]:
     parser = argparse.ArgumentParser(
         description="Compare news coverage of the same story across multiple sources."

@@ -68,3 +68,40 @@ def test_fetch_all_skips_failed_urls(capsys):
         results = fetch_all(["https://good.com/a", "https://bad.com/a"])
     assert len(results) == 1
     assert results[0][0] == "Good"
+
+
+from news_debias import parse_sections, SECTION_HEADERS
+
+SAMPLE_RESPONSE = """\
+1. WHAT ALL SOURCES AGREE ON
+The protest occurred on Tuesday. Three people were arrested.
+
+2. HOW EACH SOURCE FRAMED IT
+BBC led with the arrests. Reuters focused on the crowd size.
+
+3. LANGUAGE WORTH NOTICING
+BBC used "clashes"; Reuters used "demonstrations".
+
+4. FACTS ONLY ONE SOURCE REPORTED
+BBC: Police used rubber bullets. (not mentioned by Reuters)
+"""
+
+
+def test_parse_sections_extracts_all_four():
+    sections = parse_sections(SAMPLE_RESPONSE)
+    assert len(sections) == 4
+    for header in SECTION_HEADERS:
+        assert header in sections
+
+
+def test_parse_sections_content_accuracy():
+    sections = parse_sections(SAMPLE_RESPONSE)
+    assert "Three people were arrested" in sections["WHAT ALL SOURCES AGREE ON"]
+    assert "Reuters focused on the crowd size" in sections["HOW EACH SOURCE FRAMED IT"]
+    assert "rubber bullets" in sections["FACTS ONLY ONE SOURCE REPORTED"]
+
+
+def test_parse_sections_missing_header_returns_empty():
+    sections = parse_sections("No headers at all in this text.")
+    for header in SECTION_HEADERS:
+        assert sections[header] == ""
