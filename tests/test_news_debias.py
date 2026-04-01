@@ -105,3 +105,47 @@ def test_parse_sections_missing_header_returns_empty():
     sections = parse_sections("No headers at all in this text.")
     for header in SECTION_HEADERS:
         assert sections[header] == ""
+
+
+from unittest.mock import MagicMock, patch
+from news_debias import main, MODEL, SYSTEM_PROMPT
+
+
+def test_main_exits_if_fewer_than_2_articles(monkeypatch):
+    monkeypatch.setattr("sys.argv", ["news_debias.py", "https://a.com", "https://b.com"])
+    with patch("news_debias.fetch_all", return_value=[("BBC", "text")]):
+        with pytest.raises(SystemExit):
+            main()
+
+
+def test_main_calls_api_and_renders(monkeypatch):
+    monkeypatch.setattr("sys.argv", ["news_debias.py", "https://a.com", "https://b.com"])
+
+    mock_content = MagicMock()
+    mock_content.text = (
+        "1. WHAT ALL SOURCES AGREE ON\nFact.\n"
+        "2. HOW EACH SOURCE FRAMED IT\nFraming.\n"
+        "3. LANGUAGE WORTH NOTICING\nLanguage.\n"
+        "4. FACTS ONLY ONE SOURCE REPORTED\nUnique.\n"
+    )
+    mock_usage = MagicMock()
+    mock_usage.input_tokens = 100
+    mock_usage.output_tokens = 200
+
+    mock_response = MagicMock()
+    mock_response.content = [mock_content]
+    mock_response.usage = mock_usage
+
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = mock_response
+
+    articles = [("Acom", "text a"), ("Bcom", "text b")]
+
+    with patch("news_debias.fetch_all", return_value=articles), \
+         patch("news_debias.anthropic.Anthropic", return_value=mock_client):
+        main()  # Should not raise
+
+    mock_client.messages.create.assert_called_once()
+    call_kwargs = mock_client.messages.create.call_args.kwargs
+    assert call_kwargs["model"] == MODEL
+    assert call_kwargs["system"] == SYSTEM_PROMPT

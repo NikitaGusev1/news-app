@@ -88,3 +88,45 @@ def parse_args() -> list[str]:
     if not 2 <= len(args.urls) <= 5:
         parser.error(f"Provide between 2 and 5 URLs (got {len(args.urls)})")
     return args.urls
+
+
+def render_output(
+    sections: dict[str, str],
+    articles: list[tuple[str, str]],
+    urls: list[str],
+    usage: object,
+) -> None:
+    console = Console()
+    for header in SECTION_HEADERS:
+        console.print(Panel(sections.get(header, ""), title=f"[bold]{header}[/bold]", expand=True))
+    footer = (
+        f"Sources: {len(articles)}/{len(urls)} fetched  |  "
+        f"Model: {MODEL}  |  "
+        f"Tokens: {usage.input_tokens} in / {usage.output_tokens} out"
+    )
+    console.print(f"\n[dim]{footer}[/dim]")
+
+
+def main() -> None:
+    urls = parse_args()
+    articles = fetch_all(urls)
+    if len(articles) < 2:
+        print(f"Need at least 2 sources to compare, only got {len(articles)}.")
+        sys.exit(1)
+
+    prompt = build_prompt(articles)
+    client = anthropic.Anthropic()
+    response = client.messages.create(
+        model=MODEL,
+        max_tokens=4096,
+        system=SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    text = response.content[0].text
+    sections = parse_sections(text)
+    render_output(sections, articles, urls, response.usage)
+
+
+if __name__ == "__main__":
+    main()
