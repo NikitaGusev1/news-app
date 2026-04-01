@@ -50,6 +50,21 @@ def build_prompt(articles: list[tuple[str, str]]) -> str:
     return "\n\n".join(parts)
 
 
+def fetch_all(urls: list[str]) -> list[tuple[str, str]]:
+    console = Console(stderr=True)
+    results: dict[str, tuple[str, str]] = {}
+    with ThreadPoolExecutor() as executor:
+        futures = {executor.submit(fetch_article, url): url for url in urls}
+        for future in as_completed(futures):
+            url = futures[future]
+            try:
+                results[url] = future.result()
+            except ValueError as exc:
+                console.print(f"[yellow]Warning:[/yellow] Skipping {url}: {exc}")
+    # Preserve original URL order
+    return [results[url] for url in urls if url in results]
+
+
 def parse_args() -> list[str]:
     parser = argparse.ArgumentParser(
         description="Compare news coverage of the same story across multiple sources."
