@@ -58,3 +58,16 @@ def parse_sections(text: str) -> dict[str, str]:
         end = text.find(next_header, start) if next_header else len(text)
         sections[header] = text[start:end].strip()
     return sections
+
+
+def fetch_all(urls: list[str]) -> list[tuple[str, str]]:
+    results: dict[str, tuple[str, str]] = {}
+    with ThreadPoolExecutor() as executor:
+        futures = {executor.submit(fetch_article, url): url for url in urls}
+        for future in as_completed(futures):
+            url = futures[future]
+            try:
+                results[url] = future.result()
+            except ValueError:
+                pass  # Failed URLs are counted via meta in the API response
+    return [results[url] for url in urls if url in results]
