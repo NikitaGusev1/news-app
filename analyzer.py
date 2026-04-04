@@ -1,7 +1,5 @@
 import anthropic
 
-from fetcher import fetch_article
-
 MODEL = "claude-sonnet-4-6"
 
 SYSTEM_PROMPT = """\
@@ -38,6 +36,8 @@ SECTION_HEADERS = [
     "FACTS ONLY ONE SOURCE REPORTED",
 ]
 
+client = anthropic.Anthropic()
+
 
 def build_prompt(articles: list[tuple[str, str]]) -> str:
     parts = [f"--- SOURCE: {label} ---\n{text}" for label, text in articles]
@@ -59,12 +59,7 @@ def parse_sections(text: str) -> dict[str, str]:
 
 
 def analyze(articles: list[tuple[str, str]]) -> dict:
-    """
-    Takes list of (domain_label, article_text) tuples.
-    Returns {"sections": {...}, "tokens_used": N}.
-    """
     prompt = build_prompt(articles)
-    client = anthropic.Anthropic()
     response = client.messages.create(
         model=MODEL,
         max_tokens=4096,
@@ -74,5 +69,7 @@ def analyze(articles: list[tuple[str, str]]) -> dict:
     sections = parse_sections(response.content[0].text)
     return {
         "sections": sections,
+        "input_tokens": response.usage.input_tokens,
+        "output_tokens": response.usage.output_tokens,
         "tokens_used": response.usage.input_tokens + response.usage.output_tokens,
     }

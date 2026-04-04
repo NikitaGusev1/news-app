@@ -26,7 +26,7 @@ def test_parse_args_too_many_exits(monkeypatch):
         parse_args()
 
 
-from news_debias import build_prompt
+from analyzer import build_prompt
 
 
 def test_build_prompt_includes_source_headers():
@@ -41,19 +41,18 @@ def test_build_prompt_includes_source_headers():
 def test_build_prompt_separates_sources():
     articles = [("A", "text a"), ("B", "text b")]
     result = build_prompt(articles)
-    # A's section must come before B's
     assert result.index("--- SOURCE: A ---") < result.index("--- SOURCE: B ---")
 
 
 from unittest.mock import patch
-from news_debias import fetch_all
+from fetcher import fetch_all
 
 
 def test_fetch_all_returns_successful_articles():
     def fake_fetch(url):
         return (url.split("//")[1].split(".")[0].capitalize(), f"text from {url}")
 
-    with patch("news_debias.fetch_article", side_effect=fake_fetch):
+    with patch("fetcher.fetch_article", side_effect=fake_fetch):
         results = fetch_all(["https://bbc.com/a", "https://cnn.com/b"])
     assert len(results) == 2
 
@@ -64,13 +63,13 @@ def test_fetch_all_skips_failed_urls():
             raise ValueError("Failed to fetch https://bad.com/a")
         return ("Good", "good text")
 
-    with patch("news_debias.fetch_article", side_effect=fake_fetch):
+    with patch("fetcher.fetch_article", side_effect=fake_fetch):
         results = fetch_all(["https://good.com/a", "https://bad.com/a"])
     assert len(results) == 1
     assert results[0][0] == "Good"
 
 
-from news_debias import parse_sections, SECTION_HEADERS
+from analyzer import parse_sections, SECTION_HEADERS
 
 SAMPLE_RESPONSE = """\
 1. WHAT ALL SOURCES AGREE ON
@@ -108,7 +107,8 @@ def test_parse_sections_missing_header_returns_empty():
 
 
 from unittest.mock import MagicMock, patch
-from news_debias import main, MODEL, SYSTEM_PROMPT
+from news_debias import main
+from analyzer import MODEL, SYSTEM_PROMPT
 
 
 def test_main_exits_if_fewer_than_2_articles(monkeypatch):
@@ -142,7 +142,7 @@ def test_main_calls_api_and_renders(monkeypatch):
     articles = [("Acom", "text a"), ("Bcom", "text b")]
 
     with patch("news_debias.fetch_all", return_value=articles), \
-         patch("news_debias.anthropic.Anthropic", return_value=mock_client):
+         patch("analyzer.client", mock_client):
         main()  # Should not raise
 
     mock_client.messages.create.assert_called_once()

@@ -121,7 +121,7 @@ def test_analyze_returns_sections_and_token_count():
     mock_client = MagicMock()
     mock_client.messages.create.return_value = mock_response
 
-    with patch("analyzer.anthropic.Anthropic", return_value=mock_client):
+    with patch("analyzer.client", mock_client):
         result = analyze([("BBC", "text a"), ("Reuters", "text b")])
 
     assert "sections" in result
@@ -142,7 +142,7 @@ def test_analyze_calls_correct_model_and_system_prompt():
     mock_client = MagicMock()
     mock_client.messages.create.return_value = mock_response
 
-    with patch("analyzer.anthropic.Anthropic", return_value=mock_client):
+    with patch("analyzer.client", mock_client):
         analyze([("BBC", "text a"), ("Reuters", "text b")])
 
     kwargs = mock_client.messages.create.call_args.kwargs
