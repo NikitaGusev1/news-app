@@ -90,3 +90,62 @@ def test_fetch_all_preserves_url_order():
     with patch("analyzer.fetch_article", side_effect=fake_fetch):
         results = fetch_all(urls)
     assert [label for label, _ in results] == ["A", "B", "C"]
+
+
+from analyzer import analyze, MODEL, SYSTEM_PROMPT
+
+SAMPLE_RESPONSE_FOR_ANALYZE = """\
+1. WHAT ALL SOURCES AGREE ON
+Agreed facts here.
+
+2. HOW EACH SOURCE FRAMED IT
+Framing details here.
+
+3. LANGUAGE WORTH NOTICING
+Loaded phrases here.
+
+4. FACTS ONLY ONE SOURCE REPORTED
+Unique claims here.
+"""
+
+
+def test_analyze_returns_sections_and_token_count():
+    mock_content = MagicMock()
+    mock_content.text = SAMPLE_RESPONSE_FOR_ANALYZE
+    mock_usage = MagicMock()
+    mock_usage.input_tokens = 100
+    mock_usage.output_tokens = 200
+    mock_response = MagicMock()
+    mock_response.content = [mock_content]
+    mock_response.usage = mock_usage
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = mock_response
+
+    with patch("analyzer.anthropic.Anthropic", return_value=mock_client):
+        result = analyze([("BBC", "text a"), ("Reuters", "text b")])
+
+    assert "sections" in result
+    assert "tokens_used" in result
+    assert result["tokens_used"] == 300
+    assert "Agreed facts" in result["sections"]["WHAT ALL SOURCES AGREE ON"]
+
+
+def test_analyze_calls_correct_model_and_system_prompt():
+    mock_content = MagicMock()
+    mock_content.text = SAMPLE_RESPONSE_FOR_ANALYZE
+    mock_usage = MagicMock()
+    mock_usage.input_tokens = 50
+    mock_usage.output_tokens = 50
+    mock_response = MagicMock()
+    mock_response.content = [mock_content]
+    mock_response.usage = mock_usage
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = mock_response
+
+    with patch("analyzer.anthropic.Anthropic", return_value=mock_client):
+        analyze([("BBC", "text a"), ("Reuters", "text b")])
+
+    kwargs = mock_client.messages.create.call_args.kwargs
+    assert kwargs["model"] == MODEL
+    assert kwargs["max_tokens"] == 4096
+    assert kwargs["system"] == SYSTEM_PROMPT

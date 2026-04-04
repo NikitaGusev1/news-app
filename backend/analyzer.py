@@ -71,3 +71,23 @@ def fetch_all(urls: list[str]) -> list[tuple[str, str]]:
             except ValueError:
                 pass  # Failed URLs are counted via meta in the API response
     return [results[url] for url in urls if url in results]
+
+
+def analyze(articles: list[tuple[str, str]]) -> dict:
+    """
+    Takes list of (domain_label, article_text) tuples.
+    Returns {"sections": {...}, "tokens_used": N}.
+    """
+    prompt = build_prompt(articles)
+    client = anthropic.Anthropic()
+    response = client.messages.create(
+        model=MODEL,
+        max_tokens=4096,
+        system=SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    sections = parse_sections(response.content[0].text)
+    return {
+        "sections": sections,
+        "tokens_used": response.usage.input_tokens + response.usage.output_tokens,
+    }
