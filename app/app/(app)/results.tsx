@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   View,
   Text,
@@ -34,14 +34,21 @@ type SectionKey = (typeof TABS)[number]['key']
 
 export default function ResultsScreen() {
   const { urls: urlsParam } = useLocalSearchParams<{ urls: string }>()
-  const urls: string[] = JSON.parse(urlsParam ?? '[]')
+
+  let parsedUrls: string[] = []
+  try {
+    parsedUrls = JSON.parse(urlsParam ?? '[]')
+  } catch {
+    // malformed param — fall through with empty array; backend will return 400
+  }
+  const urls = useMemo(() => parsedUrls, [urlsParam])
 
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<AnalysisData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<SectionKey>('WHAT ALL SOURCES AGREE ON')
 
-  const fetchAnalysis = async () => {
+  const fetchAnalysis = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -60,11 +67,11 @@ export default function ResultsScreen() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [urls])
 
   useEffect(() => {
     fetchAnalysis()
-  }, [])
+  }, [fetchAnalysis])
 
   const handleShare = () => {
     if (!data) return
@@ -91,11 +98,13 @@ export default function ResultsScreen() {
     )
   }
 
+  if (!data) return null
+
   return (
     <View style={styles.container}>
-      {data!.meta.sources_fetched < data!.meta.sources_requested && (
+      {data.meta.sources_fetched < data.meta.sources_requested && (
         <Text style={styles.warning}>
-          Only {data!.meta.sources_fetched} of {data!.meta.sources_requested} sources could be fetched
+          Only {data.meta.sources_fetched} of {data.meta.sources_requested} sources could be fetched
         </Text>
       )}
       <ScrollView
@@ -118,7 +127,7 @@ export default function ResultsScreen() {
         ))}
       </ScrollView>
       <ScrollView style={styles.content}>
-        <Text style={styles.sectionText}>{data!.sections[activeTab]}</Text>
+        <Text style={styles.sectionText}>{data.sections[activeTab]}</Text>
       </ScrollView>
       <Pressable testID="share-button" onPress={handleShare} style={styles.shareButton}>
         <Text style={styles.shareText}>Share</Text>
