@@ -2,7 +2,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from analyzer import analyze, fetch_all
+from analyzer import analyze
+from fetcher import fetch_all
 
 app = FastAPI()
 

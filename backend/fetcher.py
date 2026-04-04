@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 
 import trafilatura
@@ -25,3 +26,16 @@ def fetch_article(url: str) -> tuple[str, str]:
     if not text:
         raise ValueError(f"Failed to extract article text from {url}")
     return label, text[:8000]
+
+
+def fetch_all(urls: list[str]) -> list[tuple[str, str]]:
+    results: dict[str, tuple[str, str]] = {}
+    with ThreadPoolExecutor() as executor:
+        futures = {executor.submit(fetch_article, url): url for url in urls}
+        for future in as_completed(futures):
+            url = futures[future]
+            try:
+                results[url] = future.result()
+            except ValueError:
+                pass
+    return [results[url] for url in urls if url in results]

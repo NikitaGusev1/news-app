@@ -52,3 +52,12 @@ def test_analyze_meta_reflects_skipped_sources():
     data = response.json()
     assert data["meta"]["sources_fetched"] == 2
     assert data["meta"]["sources_requested"] == 3
+
+
+def test_analyze_returns_500_on_unexpected_error():
+    error_client = TestClient(app, raise_server_exceptions=False)
+    articles = [("BBC", "text a"), ("Reuters", "text b")]
+    with patch("main.fetch_all", return_value=articles), \
+         patch("main.analyze", side_effect=Exception("unexpected")):
+        response = error_client.post("/analyze", json={"urls": ["https://bbc.com", "https://reuters.com"]})
+    assert response.status_code == 500

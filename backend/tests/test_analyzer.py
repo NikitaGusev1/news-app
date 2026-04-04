@@ -57,14 +57,14 @@ def test_parse_sections_missing_header_returns_empty():
         assert sections[header] == ""
 
 
-from analyzer import fetch_all
+from fetcher import fetch_all
 
 
 def test_fetch_all_returns_successful_articles():
     def fake_fetch(url):
         return (url.split("//")[1].split(".")[0].capitalize(), f"text from {url}")
 
-    with patch("analyzer.fetch_article", side_effect=fake_fetch):
+    with patch("fetcher.fetch_article", side_effect=fake_fetch):
         results = fetch_all(["https://bbc.com/a", "https://cnn.com/b"])
     assert len(results) == 2
 
@@ -75,7 +75,7 @@ def test_fetch_all_skips_failed_urls():
             raise ValueError("Failed to fetch")
         return ("Good", "good text")
 
-    with patch("analyzer.fetch_article", side_effect=fake_fetch):
+    with patch("fetcher.fetch_article", side_effect=fake_fetch):
         results = fetch_all(["https://good.com/a", "https://bad.com/b"])
     assert len(results) == 1
     assert results[0][0] == "Good"
@@ -87,7 +87,7 @@ def test_fetch_all_preserves_url_order():
         return (label, f"text {url}")
 
     urls = ["https://example.com/a", "https://example.com/b", "https://example.com/c"]
-    with patch("analyzer.fetch_article", side_effect=fake_fetch):
+    with patch("fetcher.fetch_article", side_effect=fake_fetch):
         results = fetch_all(urls)
     assert [label for label, _ in results] == ["A", "B", "C"]
 
