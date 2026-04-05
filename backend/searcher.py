@@ -27,8 +27,9 @@ def _resolve_redirect(google_url: str) -> Optional[str]:
 
 
 def _source_label(url: str) -> Optional[str]:
+    netloc = urllib.parse.urlparse(url).netloc
     for domain, label in _SOURCE_MAP.items():
-        if domain in url:
+        if domain in netloc:
             return label
     return None
 
@@ -42,7 +43,7 @@ def _clean_title(title: str) -> str:
     return title
 
 
-def search_articles(query: str) -> list:
+def search_articles(query: str) -> list[dict]:
     if not query or not query.strip():
         return []
 
