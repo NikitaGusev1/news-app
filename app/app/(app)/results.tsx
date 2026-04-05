@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -35,43 +35,47 @@ type SectionKey = (typeof TABS)[number]['key']
 export default function ResultsScreen() {
   const { urls: urlsParam } = useLocalSearchParams<{ urls: string }>()
 
-  const urls = useMemo<string[]>(() => {
-    try {
-      return JSON.parse(urlsParam ?? '[]')
-    } catch {
-      return [] // malformed param — backend will return 400
-    }
-  }, [urlsParam])
-
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<AnalysisData | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<SectionKey>('WHAT ALL SOURCES AGREE ON')
-
-  const fetchAnalysis = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch(`${API_BASE}/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls }),
-      })
-      if (!res.ok) {
-        const body = await res.json()
-        throw new Error(body.detail ?? 'Analysis failed')
-      }
-      setData(await res.json())
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
-    } finally {
-      setLoading(false)
-    }
-  }, [urls])
+  const [activeTab, setActiveTab] = useState<SectionKey>(TABS[0].key)
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
-    fetchAnalysis()
-  }, [fetchAnalysis])
+    let urls: string[]
+    try {
+      urls = JSON.parse(urlsParam ?? '[]')
+    } catch {
+      urls = [] // malformed param — backend will return 400
+    }
+
+    const controller = new AbortController()
+    setLoading(true)
+    setError(null)
+
+    fetch(`${API_BASE}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls }),
+      signal: controller.signal,
+    })
+      .then(async res => {
+        if (!res.ok) {
+          const body = await res.json()
+          throw new Error(body.detail ?? 'Analysis failed')
+        }
+        return res.json() as Promise<AnalysisData>
+      })
+      .then(result => setData(result))
+      .catch(e => {
+        if ((e as Error).name !== 'AbortError') {
+          setError(e instanceof Error ? e.message : 'Something went wrong')
+        }
+      })
+      .finally(() => setLoading(false))
+
+    return () => controller.abort()
+  }, [urlsParam, retryCount])
 
   const handleShare = () => {
     if (!data) return
@@ -91,14 +95,12 @@ export default function ResultsScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.error}>{error}</Text>
-        <Pressable onPress={fetchAnalysis} style={styles.button}>
+        <Pressable onPress={() => setRetryCount(c => c + 1)} style={styles.button}>
           <Text style={styles.buttonText}>Try again</Text>
         </Pressable>
       </View>
     )
   }
-
-  if (!data) return null
 
   return (
     <View style={styles.container}>

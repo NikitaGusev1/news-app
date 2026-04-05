@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import { View, TextInput, Pressable, Text, StyleSheet } from 'react-native'
 import { useRouter } from 'expo-router'
 
+const MAX_SOURCES = 3
+
 export default function UrlInputScreen() {
   const router = useRouter()
   const [urls, setUrls] = useState<string[]>(['', ''])
@@ -12,11 +14,10 @@ export default function UrlInputScreen() {
     setUrls(next)
   }
 
-  const filledCount = urls.filter(u => u.trim().length > 0).length
-  const canAnalyze = filledCount >= 2
+  const nonEmpty = urls.filter(u => u.trim().length > 0)
+  const canAnalyze = nonEmpty.length >= 2
 
   const handleAnalyze = () => {
-    const nonEmpty = urls.filter(u => u.trim().length > 0)
     router.push({ pathname: '/(app)/results', params: { urls: JSON.stringify(nonEmpty) } })
   }
 
@@ -34,7 +35,7 @@ export default function UrlInputScreen() {
           style={styles.input}
         />
       ))}
-      {urls.length < 3 && (
+      {urls.length < MAX_SOURCES && (
         <Pressable
           testID="add-source-button"
           onPress={() => setUrls([...urls, ''])}
