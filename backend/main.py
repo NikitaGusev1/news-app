@@ -3,6 +3,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from typing import Optional
+
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -27,7 +29,7 @@ class AnalyzeRequest(BaseModel):
 
 
 @app.post("/analyze")
-def analyze_endpoint(request: AnalyzeRequest, x_api_key: str | None = Header(default=None)):
+def analyze_endpoint(request: AnalyzeRequest, x_api_key: Optional[str] = Header(default=None)):
     if _API_SECRET and x_api_key != _API_SECRET:
         raise HTTPException(status_code=401, detail="Unauthorized")
     articles = fetch_all(request.urls)
