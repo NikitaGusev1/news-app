@@ -128,20 +128,17 @@ export default function UrlInputScreen() {
             const selected = isSelected(item.url)
             const isDisabled = selected || selectedArticles.length >= MAX_SOURCES
             return (
-              <View
+              <Pressable
                 key={item.url}
                 testID={`result-${item.url}`}
-                // @ts-ignore: onPress on View for fireEvent compatibility
-                onPress={() => { if (!isDisabled) toggleSelect(item) }}
-                // @ts-ignore: disabled passed as host prop for test observability
+                onPress={() => toggleSelect(item)}
                 disabled={isDisabled}
-                accessible={true}
                 accessibilityState={{ disabled: isDisabled }}
                 style={[styles.result, selected && styles.resultSelected]}
               >
                 <Text style={styles.resultTitle}>{item.title}</Text>
                 <Text style={styles.resultSource}>{item.source}</Text>
-              </View>
+              </Pressable>
             )
           })}
         </ScrollView>

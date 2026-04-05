@@ -140,11 +140,11 @@ describe('article selection', () => {
     expect(getByTestId(`chip-${SEARCH_RESULTS[0].url}`)).toBeTruthy()
   })
 
-  it('selected result has disabled prop set to true', async () => {
+  it('selected result is disabled', async () => {
     const { getByTestId } = await renderWithResults()
     fireEvent.press(getByTestId(`result-${SEARCH_RESULTS[0].url}`))
     const resultEl = getByTestId(`result-${SEARCH_RESULTS[0].url}`)
-    expect(resultEl.props.disabled).toBe(true)
+    expect(resultEl.props.accessibilityState.disabled).toBe(true)
   })
 
   it('tapping chip × removes article from selection', async () => {
