@@ -55,7 +55,10 @@ export default function ResultsScreen() {
 
     fetch(`${API_BASE}/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': process.env.EXPO_PUBLIC_API_SECRET ?? '',
+      },
       body: JSON.stringify({ urls }),
       signal: controller.signal,
     })
