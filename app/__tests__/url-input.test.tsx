@@ -85,7 +85,8 @@ describe('debounce', () => {
     })
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8000/search?q=iran'
+        'http://localhost:8000/search?q=iran',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
       )
     )
   })

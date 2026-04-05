@@ -33,23 +33,29 @@ export default function UrlInputScreen() {
       setSearchError(null)
       return
     }
+    const controller = new AbortController()
     const timer = setTimeout(async () => {
       setSearching(true)
       try {
         const res = await fetch(
-          `${API_BASE}/search?q=${encodeURIComponent(query.trim())}`
+          `${API_BASE}/search?q=${encodeURIComponent(query.trim())}`,
+          { signal: controller.signal }
         )
         const data: SearchResult[] = await res.json()
         setResults(data)
         setSearchError(null)
-      } catch {
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return
         setSearchError('Search unavailable')
         setResults([])
       } finally {
         setSearching(false)
       }
     }, 400)
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
   }, [query])
 
   const isSelected = (url: string) =>
