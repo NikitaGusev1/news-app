@@ -11,9 +11,9 @@ from pydantic import BaseModel
 
 _API_SECRET = os.environ.get("API_SECRET")
 
-from analyzer import analyze
-from fetcher import fetch_all
-from searcher import search_articles
+from analyzer import analyze       # shared modules from repo root (via sys.path)
+from fetcher import fetch_all      # shared modules from repo root (via sys.path)
+from searcher import search_articles  # backend-local module
 
 app = FastAPI()
 
