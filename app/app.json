@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "news-debias",
+    "slug": "news-debias",
+    "version": "1.0.0",
+    "scheme": "news-debias",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
