@@ -35,13 +35,13 @@ type SectionKey = (typeof TABS)[number]['key']
 export default function ResultsScreen() {
   const { urls: urlsParam } = useLocalSearchParams<{ urls: string }>()
 
-  let parsedUrls: string[] = []
-  try {
-    parsedUrls = JSON.parse(urlsParam ?? '[]')
-  } catch {
-    // malformed param — fall through with empty array; backend will return 400
-  }
-  const urls = useMemo(() => parsedUrls, [urlsParam])
+  const urls = useMemo<string[]>(() => {
+    try {
+      return JSON.parse(urlsParam ?? '[]')
+    } catch {
+      return [] // malformed param — backend will return 400
+    }
+  }, [urlsParam])
 
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<AnalysisData | null>(null)
