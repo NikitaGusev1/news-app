@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 import urllib.parse
 import xml.etree.ElementTree as ET
@@ -35,7 +36,6 @@ def _source_label(url: str) -> Optional[str]:
 
 
 def _clean_title(title: str) -> str:
-    """Strip ' - Source Name' suffix that Google News appends."""
     for label in _SOURCE_MAP.values():
         suffix = f" - {label}"
         if title.endswith(suffix):
@@ -55,23 +55,25 @@ def search_articles(query: str) -> list[dict]:
     except Exception:
         return []
 
-    results = []
+    candidates = []
     for item in items:
         link_el = item.find("link")
         title_el = item.find("title")
-        if link_el is None or title_el is None:
-            continue
+        if link_el is not None and title_el is not None:
+            candidates.append((title_el.text or "", link_el.text or ""))
 
-        real_url = _resolve_redirect(link_el.text or "")
+    with ThreadPoolExecutor() as executor:
+        resolved_urls = list(executor.map(lambda c: _resolve_redirect(c[1]), candidates))
+
+    results = []
+    for (title, _), real_url in zip(candidates, resolved_urls):
         if real_url is None:
             continue
-
         source = _source_label(real_url)
         if source is None:
             continue
-
         results.append({
-            "title": _clean_title(title_el.text or ""),
+            "title": _clean_title(title),
             "url": real_url,
             "source": source,
         })
