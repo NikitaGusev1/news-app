@@ -13,13 +13,14 @@ _API_SECRET = os.environ.get("API_SECRET")
 
 from analyzer import analyze
 from fetcher import fetch_all
+from searcher import search_articles
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["POST"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -47,3 +48,8 @@ def analyze_endpoint(request: AnalyzeRequest, x_api_key: Optional[str] = Header(
             "tokens_used": result["tokens_used"],
         },
     }
+
+
+@app.get("/search")
+def search_endpoint(q: str = ""):
+    return search_articles(q)
