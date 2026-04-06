@@ -20,7 +20,6 @@ _SOURCES = [
     },
 ]
 
-_MAX_RESULTS = 10
 _HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 _STOPWORDS = {
@@ -96,11 +95,5 @@ def search_articles(query: str) -> list[dict]:
         return []
 
     terms = query.strip().lower().split()
-    all_items = _fetch_all_items()
-
-    matches = [
-        item for item in all_items
-        if all(term in item["title"].lower() for term in terms)
-    ]
-
-    return matches[:_MAX_RESULTS]
+    groups = _group_articles(_fetch_all_items())
+    return [g for g in groups if all(term in g["title"].lower() for term in terms)][:5]

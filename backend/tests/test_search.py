@@ -66,44 +66,6 @@ def _make_get_side_effect(npr_items=(), aj_items=(), dw_items=()):
     return side_effect
 
 
-@patch("searcher.httpx.get")
-def test_returns_matching_results_from_multiple_sources(mock_get):
-    mock_get.side_effect = _make_get_side_effect(
-        npr_items=[("Iran war enters week 6", "https://www.npr.org/iran-war")],
-        aj_items=[("Iran: civilians at risk", "https://www.aljazeera.com/iran")],
-    )
-    results = search_articles("iran")
-    assert len(results) == 2
-    assert results[0] == {"title": "Iran war enters week 6", "url": "https://www.npr.org/iran-war", "source": "NPR"}
-    assert results[1] == {"title": "Iran: civilians at risk", "url": "https://www.aljazeera.com/iran", "source": "Al Jazeera"}
-
-
-@patch("searcher.httpx.get")
-def test_filters_out_non_matching_titles(mock_get):
-    mock_get.side_effect = _make_get_side_effect(
-        npr_items=[
-            ("Iran war update", "https://www.npr.org/iran"),
-            ("Climate summit opens", "https://www.npr.org/climate"),
-        ],
-    )
-    results = search_articles("iran")
-    assert len(results) == 1
-    assert results[0]["title"] == "Iran war update"
-
-
-@patch("searcher.httpx.get")
-def test_multi_word_query_requires_all_terms(mock_get):
-    mock_get.side_effect = _make_get_side_effect(
-        npr_items=[
-            ("Iran war enters week 6", "https://www.npr.org/iran-war"),
-            ("Iran diplomacy talks", "https://www.npr.org/iran-diplomacy"),
-        ],
-    )
-    results = search_articles("iran war")
-    assert len(results) == 1
-    assert results[0]["title"] == "Iran war enters week 6"
-
-
 def test_blank_query_returns_empty_without_http():
     with patch("searcher.httpx.get") as mock_get:
         assert search_articles("") == []
@@ -115,27 +77,6 @@ def test_blank_query_returns_empty_without_http():
 def test_all_sources_fail_returns_empty(mock_get):
     mock_get.side_effect = Exception("connection refused")
     assert search_articles("iran") == []
-
-
-@patch("searcher.httpx.get")
-def test_failed_source_does_not_affect_others(mock_get):
-    def side_effect(url, **kwargs):
-        if "npr.org" in url:
-            return _mock_resp(_rss_xml([("iran war", "https://www.npr.org/iran")]))
-        raise Exception("timeout")
-    mock_get.side_effect = side_effect
-    results = search_articles("iran")
-    assert len(results) == 1
-    assert results[0]["source"] == "NPR"
-
-
-@patch("searcher.httpx.get")
-def test_results_capped_at_10(mock_get):
-    mock_get.side_effect = _make_get_side_effect(
-        npr_items=[(f"ukraine news {i}", f"https://www.npr.org/{i}") for i in range(15)],
-    )
-    results = search_articles("ukraine")
-    assert len(results) == 10
 
 
 def test_group_articles_groups_by_shared_significant_words():
@@ -186,6 +127,91 @@ def test_group_articles_sorts_by_source_count_descending():
     assert len(result) == 2
     assert len(result[0]["sources"]) == 3  # climate: 3 sources, ranked first
     assert len(result[1]["sources"]) == 2  # iran: 2 sources
+
+
+@patch("searcher.httpx.get")
+def test_search_returns_grouped_story(mock_get):
+    mock_get.side_effect = _make_get_side_effect(
+        npr_items=[("Iran war enters week 6", "https://www.npr.org/iran-war")],
+        aj_items=[("Iran war civilian deaths", "https://www.aljazeera.com/iran")],
+    )
+    results = search_articles("iran")
+    assert len(results) == 1
+    assert results[0]["title"] == "Iran war enters week 6"
+    assert set(results[0]["sources"]) == {"NPR", "Al Jazeera"}
+    assert set(results[0]["urls"]) == {
+        "https://www.npr.org/iran-war",
+        "https://www.aljazeera.com/iran",
+    }
+
+
+@patch("searcher.httpx.get")
+def test_search_filters_unmatched_stories(mock_get):
+    mock_get.side_effect = _make_get_side_effect(
+        npr_items=[
+            ("Iran war update", "https://www.npr.org/iran"),
+            ("Climate summit opens", "https://www.npr.org/climate"),
+        ],
+        aj_items=[
+            ("Iran war report", "https://www.aljazeera.com/iran"),
+            ("Climate summit talks", "https://www.aljazeera.com/climate"),
+        ],
+    )
+    results = search_articles("iran")
+    assert len(results) == 1
+    assert results[0]["title"] == "Iran war update"
+
+
+@patch("searcher.httpx.get")
+def test_search_multi_word_query_requires_all_terms(mock_get):
+    mock_get.side_effect = _make_get_side_effect(
+        npr_items=[
+            ("Iran war enters week 6", "https://www.npr.org/iran-war"),
+            ("Iran diplomacy progress", "https://www.npr.org/iran-diplomacy"),
+        ],
+        aj_items=[
+            ("Iran war civilian deaths", "https://www.aljazeera.com/iran-war"),
+            ("Iran diplomacy talks", "https://www.aljazeera.com/iran-diplomacy"),
+        ],
+    )
+    results = search_articles("iran war")
+    assert len(results) == 1
+    assert results[0]["title"] == "Iran war enters week 6"
+
+
+@patch("searcher.httpx.get")
+def test_search_single_source_story_excluded(mock_get):
+    # If only one source covers a story, it can't form a comparison group
+    def side_effect(url, **kwargs):
+        if "npr.org" in url:
+            return _mock_resp(_rss_xml([("Iran war update", "https://www.npr.org/iran")]))
+        raise Exception("timeout")
+    mock_get.side_effect = side_effect
+    results = search_articles("iran")
+    assert results == []
+
+
+@patch("searcher.httpx.get")
+def test_search_capped_at_5(mock_get):
+    npr_items = [
+        ("climate summit agreement", "https://www.npr.org/0"),
+        ("peace summit progress", "https://www.npr.org/1"),
+        ("trade summit negotiations", "https://www.npr.org/2"),
+        ("security summit debate", "https://www.npr.org/3"),
+        ("energy summit plans", "https://www.npr.org/4"),
+        ("health summit results", "https://www.npr.org/5"),
+    ]
+    aj_items = [
+        ("climate summit talks", "https://www.aljazeera.com/0"),
+        ("peace summit deal", "https://www.aljazeera.com/1"),
+        ("trade summit collapse", "https://www.aljazeera.com/2"),
+        ("security summit meeting", "https://www.aljazeera.com/3"),
+        ("energy summit report", "https://www.aljazeera.com/4"),
+        ("health summit response", "https://www.aljazeera.com/5"),
+    ]
+    mock_get.side_effect = _make_get_side_effect(npr_items=npr_items, aj_items=aj_items)
+    results = search_articles("summit")
+    assert len(results) == 5
 
 
 @patch("searcher.httpx.get")
