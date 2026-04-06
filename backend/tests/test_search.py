@@ -206,23 +206,33 @@ def test_get_digest_returns_grouped_stories(mock_get):
 
 @patch("searcher.httpx.get")
 def test_get_digest_capped_at_5(mock_get):
-    # 6 distinct two-source stories; digest must return only 5
+    # 6 distinct two-source stories with no shared significant words across pairs
     npr_items = [
-        ("climate summit agreement", "https://www.npr.org/0"),
-        ("peace summit progress", "https://www.npr.org/1"),
-        ("trade summit negotiations", "https://www.npr.org/2"),
-        ("security summit debate", "https://www.npr.org/3"),
-        ("energy summit plans", "https://www.npr.org/4"),
-        ("health summit results", "https://www.npr.org/5"),
+        ("iran war escalates", "https://www.npr.org/0"),
+        ("ukraine ceasefire talks", "https://www.npr.org/1"),
+        ("climate floods devastate", "https://www.npr.org/2"),
+        ("election results disputed", "https://www.npr.org/3"),
+        ("earthquake rescue continues", "https://www.npr.org/4"),
+        ("pandemic variant spreads", "https://www.npr.org/5"),
     ]
     aj_items = [
-        ("climate summit talks", "https://www.aljazeera.com/0"),
-        ("peace summit deal", "https://www.aljazeera.com/1"),
-        ("trade summit collapse", "https://www.aljazeera.com/2"),
-        ("security summit meeting", "https://www.aljazeera.com/3"),
-        ("energy summit report", "https://www.aljazeera.com/4"),
-        ("health summit response", "https://www.aljazeera.com/5"),
+        ("iran war civilian deaths", "https://www.aljazeera.com/0"),
+        ("ukraine ceasefire deal", "https://www.aljazeera.com/1"),
+        ("climate floods emergency", "https://www.aljazeera.com/2"),
+        ("election results challenged", "https://www.aljazeera.com/3"),
+        ("earthquake rescue operation", "https://www.aljazeera.com/4"),
+        ("pandemic variant detected", "https://www.aljazeera.com/5"),
     ]
     mock_get.side_effect = _make_get_side_effect(npr_items=npr_items, aj_items=aj_items)
     result = get_digest()
     assert len(result) == 5
+
+
+@patch("searcher.httpx.get")
+def test_get_digest_returns_empty_when_no_cross_source_stories(mock_get):
+    mock_get.side_effect = _make_get_side_effect(
+        npr_items=[("iran update", "https://www.npr.org/iran")],
+        aj_items=[("climate report", "https://www.aljazeera.com/climate")],
+    )
+    result = get_digest()
+    assert result == []

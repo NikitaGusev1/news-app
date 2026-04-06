@@ -60,16 +60,6 @@ def _group_articles(items: list[dict]) -> list[dict]:
     return [{"title": g["title"], "sources": g["sources"], "urls": g["urls"]} for g in multi]
 
 
-def _fetch_all_items() -> list[dict]:
-    with ThreadPoolExecutor() as executor:
-        all_items_lists = list(executor.map(_fetch_source, _SOURCES))
-    return [item for sublist in all_items_lists for item in sublist]
-
-
-def get_digest() -> list[dict]:
-    return _group_articles(_fetch_all_items())[:5]
-
-
 def _fetch_source(source: dict) -> list[dict]:
     try:
         resp = httpx.get(source["feed"], follow_redirects=True, timeout=8, headers=_HEADERS)
@@ -89,6 +79,16 @@ def _fetch_source(source: dict) -> list[dict]:
         return results
     except Exception:
         return []
+
+
+def _fetch_all_items() -> list[dict]:
+    with ThreadPoolExecutor() as executor:
+        all_items_lists = list(executor.map(_fetch_source, _SOURCES))
+    return [item for sublist in all_items_lists for item in sublist]
+
+
+def get_digest() -> list[dict]:
+    return _group_articles(_fetch_all_items())[:5]
 
 
 def search_articles(query: str) -> list[dict]:
