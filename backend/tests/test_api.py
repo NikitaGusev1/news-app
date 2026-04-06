@@ -108,5 +108,8 @@ def test_digest_returns_grouped_stories():
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["title"] == "Iran war"
-    assert data[0]["sources"] == ["NPR", "Al Jazeera"]
+    assert data[0] == {
+        "title": "Iran war",
+        "sources": ["NPR", "Al Jazeera"],
+        "urls": ["https://www.npr.org/iran", "https://www.aljazeera.com/iran"],
+    }
