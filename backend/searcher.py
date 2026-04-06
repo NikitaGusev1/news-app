@@ -23,6 +23,42 @@ _SOURCES = [
 _MAX_RESULTS = 10
 _HEADERS = {"User-Agent": "Mozilla/5.0"}
 
+_STOPWORDS = {
+    "the", "a", "an", "is", "of", "in", "on", "at", "by", "for",
+    "with", "to", "and", "or", "that", "this", "it", "as", "are",
+    "was", "were", "has", "have", "been", "its",
+}
+
+
+def _significant_words(title: str) -> set[str]:
+    return {w for w in title.lower().split() if w.isalpha() and w not in _STOPWORDS}
+
+
+def _group_articles(items: list[dict]) -> list[dict]:
+    groups: list[dict] = []
+    for item in items:
+        words = _significant_words(item["title"])
+        matched = None
+        for group in groups:
+            if len(words & group["_words"]) >= 2:
+                matched = group
+                break
+        if matched is not None:
+            if item["source"] not in matched["sources"]:
+                matched["sources"].append(item["source"])
+                matched["urls"].append(item["url"])
+                matched["_words"] |= words
+        else:
+            groups.append({
+                "title": item["title"],
+                "sources": [item["source"]],
+                "urls": [item["url"]],
+                "_words": words,
+            })
+    multi = [g for g in groups if len(g["sources"]) > 1]
+    multi.sort(key=lambda g: len(g["sources"]), reverse=True)
+    return [{"title": g["title"], "sources": g["sources"], "urls": g["urls"]} for g in multi]
+
 
 def _fetch_source(source: dict) -> list[dict]:
     try:
