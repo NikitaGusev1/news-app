@@ -1,6 +1,6 @@
 from unittest.mock import patch, MagicMock
 
-from searcher import search_articles, _fetch_source, _group_articles
+from searcher import search_articles, _fetch_source, _group_articles, get_digest
 
 
 def _rss_xml(items):
@@ -186,3 +186,43 @@ def test_group_articles_sorts_by_source_count_descending():
     assert len(result) == 2
     assert len(result[0]["sources"]) == 3  # climate: 3 sources, ranked first
     assert len(result[1]["sources"]) == 2  # iran: 2 sources
+
+
+@patch("searcher.httpx.get")
+def test_get_digest_returns_grouped_stories(mock_get):
+    mock_get.side_effect = _make_get_side_effect(
+        npr_items=[("Iran war enters week 6", "https://www.npr.org/iran-war")],
+        aj_items=[("Iran war civilian deaths", "https://www.aljazeera.com/iran")],
+    )
+    result = get_digest()
+    assert len(result) == 1
+    assert result[0]["title"] == "Iran war enters week 6"
+    assert set(result[0]["sources"]) == {"NPR", "Al Jazeera"}
+    assert set(result[0]["urls"]) == {
+        "https://www.npr.org/iran-war",
+        "https://www.aljazeera.com/iran",
+    }
+
+
+@patch("searcher.httpx.get")
+def test_get_digest_capped_at_5(mock_get):
+    # 6 distinct two-source stories; digest must return only 5
+    npr_items = [
+        ("climate summit agreement", "https://www.npr.org/0"),
+        ("peace summit progress", "https://www.npr.org/1"),
+        ("trade summit negotiations", "https://www.npr.org/2"),
+        ("security summit debate", "https://www.npr.org/3"),
+        ("energy summit plans", "https://www.npr.org/4"),
+        ("health summit results", "https://www.npr.org/5"),
+    ]
+    aj_items = [
+        ("climate summit talks", "https://www.aljazeera.com/0"),
+        ("peace summit deal", "https://www.aljazeera.com/1"),
+        ("trade summit collapse", "https://www.aljazeera.com/2"),
+        ("security summit meeting", "https://www.aljazeera.com/3"),
+        ("energy summit report", "https://www.aljazeera.com/4"),
+        ("health summit response", "https://www.aljazeera.com/5"),
+    ]
+    mock_get.side_effect = _make_get_side_effect(npr_items=npr_items, aj_items=aj_items)
+    result = get_digest()
+    assert len(result) == 5
