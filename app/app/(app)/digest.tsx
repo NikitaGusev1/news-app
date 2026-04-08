@@ -55,8 +55,10 @@ export default function DigestScreen() {
     setRefreshing(false)
   }
 
+  const trimmedQuery = query.trim()
+
   useEffect(() => {
-    if (!query.trim()) {
+    if (!trimmedQuery) {
       setSearch({ status: 'idle' })
       return
     }
@@ -65,7 +67,7 @@ export default function DigestScreen() {
       setSearch({ status: 'loading' })
       try {
         const res = await fetch(
-          `${API_BASE}/search?q=${encodeURIComponent(query.trim())}`,
+          `${API_BASE}/search?q=${encodeURIComponent(trimmedQuery)}`,
           { signal: controller.signal }
         )
         const data: Story[] = await res.json()
@@ -79,16 +81,16 @@ export default function DigestScreen() {
       clearTimeout(timer)
       controller.abort()
     }
-  }, [query])
+  }, [trimmedQuery])
 
-  const handleStoryPress = (story: Story) => {
+  const handleStoryPress = useCallback((story: Story) => {
     router.push({
       pathname: '/(app)/results',
       params: { urls: JSON.stringify(story.urls) },
     })
-  }
+  }, [router])
 
-  const renderStory = ({ item }: { item: Story }) => (
+  const renderStory = useCallback(({ item }: { item: Story }) => (
     <Pressable
       testID={`story-${item.title}`}
       onPress={() => handleStoryPress(item)}
@@ -99,9 +101,9 @@ export default function DigestScreen() {
         {item.sources.join(' · ')}
       </Text>
     </Pressable>
-  )
+  ), [handleStoryPress])
 
-  const isSearchMode = query.trim().length > 0
+  const isSearchMode = trimmedQuery.length > 0
 
   let listData: Story[] = []
   let showDigestLoading = false
@@ -147,7 +149,7 @@ export default function DigestScreen() {
 
       {showNoResults && (
         <Text testID="no-results" style={styles.feedbackText}>
-          No results for {query.trim()}
+          No results for {trimmedQuery}
         </Text>
       )}
 
@@ -172,7 +174,7 @@ export default function DigestScreen() {
         <FlatList
           testID="story-list"
           data={listData}
-          keyExtractor={item => item.title}
+          keyExtractor={item => item.urls[0]}
           renderItem={renderStory}
           onRefresh={isSearchMode ? undefined : handleRefresh}
           refreshing={isSearchMode ? false : refreshing}

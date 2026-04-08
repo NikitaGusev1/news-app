@@ -21,6 +21,7 @@ _SOURCES = [
 ]
 
 _HEADERS = {"User-Agent": "Mozilla/5.0"}
+_DIGEST_SIZE = 5
 
 _STOPWORDS = {
     "the", "a", "an", "is", "of", "in", "on", "at", "by", "for",
@@ -87,7 +88,7 @@ def _fetch_all_items() -> list[dict]:
 
 
 def get_digest() -> list[dict]:
-    return _group_articles(_fetch_all_items())[:5]
+    return _group_articles(_fetch_all_items())[:_DIGEST_SIZE]
 
 
 def search_articles(query: str) -> list[dict]:
@@ -96,4 +97,4 @@ def search_articles(query: str) -> list[dict]:
 
     terms = query.strip().lower().split()
     groups = _group_articles(_fetch_all_items())
-    return [g for g in groups if all(term in g["title"].lower() for term in terms)][:5]
+    return [g for g in groups if all(term in g["title"].lower() for term in terms)][:_DIGEST_SIZE]
