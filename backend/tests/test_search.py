@@ -1,6 +1,6 @@
 from unittest.mock import patch, MagicMock
 
-from searcher import search_articles, _fetch_source
+from searcher import search_articles, _fetch_source, _group_articles
 
 
 def _rss_xml(items):
@@ -136,3 +136,50 @@ def test_results_capped_at_10(mock_get):
     )
     results = search_articles("ukraine")
     assert len(results) == 10
+
+
+def test_group_articles_groups_by_shared_significant_words():
+    items = [
+        {"title": "Iran war enters week six", "url": "https://www.npr.org/iran", "source": "NPR"},
+        {"title": "Iran war civilians flee", "url": "https://www.aljazeera.com/iran", "source": "Al Jazeera"},
+    ]
+    result = _group_articles(items)
+    assert len(result) == 1
+    assert result[0]["title"] == "Iran war enters week six"
+    assert set(result[0]["sources"]) == {"NPR", "Al Jazeera"}
+    assert set(result[0]["urls"]) == {
+        "https://www.npr.org/iran",
+        "https://www.aljazeera.com/iran",
+    }
+
+
+def test_group_articles_excludes_single_source_groups():
+    items = [
+        {"title": "Iran update", "url": "https://www.npr.org/iran", "source": "NPR"},
+        {"title": "Climate summit", "url": "https://www.aljazeera.com/climate", "source": "Al Jazeera"},
+    ]
+    result = _group_articles(items)
+    assert result == []
+
+
+def test_group_articles_ignores_stopwords_for_overlap():
+    items = [
+        {"title": "the Iran update", "url": "https://www.npr.org/iran", "source": "NPR"},
+        {"title": "a Iran report", "url": "https://www.aljazeera.com/iran", "source": "Al Jazeera"},
+    ]
+    result = _group_articles(items)
+    assert result == []
+
+
+def test_group_articles_sorts_by_source_count_descending():
+    items = [
+        {"title": "Iran war update", "url": "https://www.npr.org/iran", "source": "NPR"},
+        {"title": "Iran war report", "url": "https://www.aljazeera.com/iran", "source": "Al Jazeera"},
+        {"title": "Climate summit opens today", "url": "https://www.dw.com/climate", "source": "DW"},
+        {"title": "Climate summit begins now", "url": "https://www.npr.org/climate", "source": "NPR"},
+        {"title": "Climate summit underway", "url": "https://www.aljazeera.com/climate", "source": "Al Jazeera"},
+    ]
+    result = _group_articles(items)
+    assert len(result) == 2
+    assert len(result[0]["sources"]) == 3
+    assert len(result[1]["sources"]) == 2
