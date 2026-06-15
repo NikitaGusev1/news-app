@@ -21,6 +21,7 @@ _SOURCES = [
 ]
 
 _MAX_RESULTS = 10
+_MAX_DIGEST_GROUPS = 5
 _HEADERS = {"User-Agent": "Mozilla/5.0"}
 _STOPWORDS = {
     "the", "a", "an", "is", "of", "in", "on", "at", "by", "for",
@@ -98,16 +99,24 @@ def _fetch_source(source: dict) -> list[dict]:
         return []
 
 
+def _fetch_all_items() -> list[dict]:
+    with ThreadPoolExecutor() as executor:
+        all_items_lists = list(executor.map(_fetch_source, _SOURCES))
+
+    return [item for items in all_items_lists for item in items]
+
+
+def get_digest() -> list[dict]:
+    return _group_articles(_fetch_all_items())[:_MAX_DIGEST_GROUPS]
+
+
 def search_articles(query: str) -> list[dict]:
     if not query or not query.strip():
         return []
 
     terms = query.strip().lower().split()
 
-    with ThreadPoolExecutor() as executor:
-        all_items_lists = list(executor.map(_fetch_source, _SOURCES))
-
-    all_items = [item for items in all_items_lists for item in items]
+    all_items = _fetch_all_items()
 
     matches = [
         item for item in all_items

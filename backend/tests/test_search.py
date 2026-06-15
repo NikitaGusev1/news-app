@@ -1,6 +1,6 @@
 from unittest.mock import patch, MagicMock
 
-from searcher import search_articles, _fetch_source, _group_articles
+from searcher import search_articles, get_digest, _fetch_source, _group_articles
 
 
 def _rss_xml(items):
@@ -136,6 +136,67 @@ def test_results_capped_at_10(mock_get):
     )
     results = search_articles("ukraine")
     assert len(results) == 10
+
+
+@patch("searcher.httpx.get")
+def test_get_digest_returns_grouped_stories_from_feeds(mock_get):
+    mock_get.side_effect = _make_get_side_effect(
+        npr_items=[
+            ("Iran war enters week six", "https://www.npr.org/iran"),
+            ("Climate summit opens today", "https://www.npr.org/climate"),
+        ],
+        aj_items=[
+            ("Iran war civilians flee", "https://www.aljazeera.com/iran"),
+        ],
+        dw_items=[
+            ("Climate summit begins now", "https://www.dw.com/climate"),
+        ],
+    )
+    result = get_digest()
+    assert len(result) == 2
+    assert result[0]["title"] == "Iran war enters week six"
+    assert set(result[0]["sources"]) == {"NPR", "Al Jazeera"}
+    assert set(result[0]["urls"]) == {
+        "https://www.npr.org/iran",
+        "https://www.aljazeera.com/iran",
+    }
+    assert result[1]["title"] == "Climate summit opens today"
+    assert set(result[1]["sources"]) == {"NPR", "DW"}
+    assert set(result[1]["urls"]) == {
+        "https://www.npr.org/climate",
+        "https://www.dw.com/climate",
+    }
+
+
+@patch("searcher.httpx.get")
+def test_get_digest_caps_results_at_5_groups(mock_get):
+    topics = [
+        "alpha economy",
+        "bravo markets",
+        "charlie politics",
+        "delta climate",
+        "echo health",
+        "foxtrot science",
+    ]
+    mock_get.side_effect = _make_get_side_effect(
+        npr_items=[
+            (f"{topic} update", f"https://www.npr.org/{topic.replace(' ', '-')}")
+            for topic in topics
+        ],
+        aj_items=[
+            (f"{topic} report", f"https://www.aljazeera.com/{topic.replace(' ', '-')}")
+            for topic in topics
+        ],
+    )
+    result = get_digest()
+    assert len(result) == 5
+    assert [group["title"] for group in result] == [
+        "alpha economy update",
+        "bravo markets update",
+        "charlie politics update",
+        "delta climate update",
+        "echo health update",
+    ]
 
 
 def test_group_articles_groups_by_shared_significant_words():
