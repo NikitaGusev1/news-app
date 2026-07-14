@@ -138,8 +138,9 @@ def test_results_capped_at_10(mock_get):
     assert len(results) == 10
 
 
+@patch("searcher.fetch_article", return_value=("source", "article text"))
 @patch("searcher.httpx.get")
-def test_get_digest_returns_grouped_stories_from_feeds(mock_get):
+def test_get_digest_returns_grouped_stories_from_feeds(mock_get, mock_fetch_article):
     mock_get.side_effect = _make_get_side_effect(
         npr_items=[
             ("Iran war enters week six", "https://www.npr.org/iran"),
@@ -166,10 +167,12 @@ def test_get_digest_returns_grouped_stories_from_feeds(mock_get):
         "https://www.npr.org/climate",
         "https://www.dw.com/climate",
     }
+    assert mock_fetch_article.call_count == 4
 
 
+@patch("searcher.fetch_article", return_value=("source", "article text"))
 @patch("searcher.httpx.get")
-def test_get_digest_caps_results_at_5_groups(mock_get):
+def test_get_digest_caps_results_at_5_groups(mock_get, mock_fetch_article):
     topics = [
         "alpha economy",
         "bravo markets",
@@ -196,6 +199,158 @@ def test_get_digest_caps_results_at_5_groups(mock_get):
         "charlie politics update",
         "delta climate update",
         "echo health update",
+    ]
+    assert mock_fetch_article.call_count == 10
+
+
+@patch("searcher.fetch_article")
+@patch("searcher.httpx.get")
+def test_get_digest_excludes_groups_below_two_fetchable_urls(mock_get, mock_fetch_article):
+    mock_get.side_effect = _make_get_side_effect(
+        npr_items=[("Iran war update", "https://www.npr.org/iran")],
+        aj_items=[("Iran war report", "https://www.aljazeera.com/iran")],
+    )
+    mock_fetch_article.side_effect = [
+        ("NPR", "article text"),
+        ValueError("failed extraction"),
+    ]
+
+    assert get_digest() == []
+
+
+@patch("searcher.fetch_article")
+@patch("searcher.httpx.get")
+def test_get_digest_keeps_source_url_alignment_after_partial_failure(mock_get, mock_fetch_article):
+    mock_get.side_effect = _make_get_side_effect(
+        npr_items=[("Climate summit opens today", "https://www.npr.org/climate")],
+        aj_items=[("Climate summit report today", "https://www.aljazeera.com/climate")],
+        dw_items=[("Climate summit begins today", "https://www.dw.com/climate")],
+    )
+
+    def extract(url):
+        if "aljazeera.com" in url:
+            raise ValueError("failed extraction")
+        return ("source", "article text")
+
+    mock_fetch_article.side_effect = extract
+
+    assert get_digest() == [{
+        "title": "Climate summit opens today",
+        "sources": ["NPR", "DW"],
+        "urls": ["https://www.npr.org/climate", "https://www.dw.com/climate"],
+    }]
+
+
+@patch("searcher.fetch_article")
+@patch("searcher.httpx.get")
+def test_get_digest_isolates_article_failure_from_other_groups(mock_get, mock_fetch_article):
+    mock_get.side_effect = _make_get_side_effect(
+        npr_items=[
+            ("Iran war update", "https://www.npr.org/iran"),
+            ("Climate summit opens", "https://www.npr.org/climate"),
+        ],
+        aj_items=[
+            ("Iran war report", "https://www.aljazeera.com/iran"),
+            ("Climate summit begins", "https://www.aljazeera.com/climate"),
+        ],
+    )
+
+    def extract(url):
+        if url == "https://www.aljazeera.com/iran":
+            raise RuntimeError("unexpected extractor failure")
+        return ("source", "article text")
+
+    mock_fetch_article.side_effect = extract
+
+    assert get_digest() == [{
+        "title": "Climate summit opens",
+        "sources": ["NPR", "Al Jazeera"],
+        "urls": ["https://www.npr.org/climate", "https://www.aljazeera.com/climate"],
+    }]
+
+
+@patch("searcher.fetch_article", side_effect=ValueError("unavailable"))
+@patch("searcher.httpx.get")
+def test_get_digest_broad_extraction_failure_returns_empty(mock_get, mock_fetch_article):
+    mock_get.side_effect = _make_get_side_effect(
+        npr_items=[("Iran war update", "https://www.npr.org/iran")],
+        aj_items=[("Iran war report", "https://www.aljazeera.com/iran")],
+    )
+
+    assert get_digest() == []
+    assert mock_fetch_article.call_count == 2
+
+
+@patch("searcher.fetch_article", return_value=("source", "article text"))
+@patch("searcher.httpx.get")
+def test_get_digest_isolates_feed_failure(mock_get, mock_fetch_article):
+    def get_feed(url, **kwargs):
+        if "npr.org" in url:
+            raise RuntimeError("feed unavailable")
+        if "aljazeera.com" in url:
+            return _mock_resp(_rss_xml([
+                ("Climate summit report", "https://www.aljazeera.com/climate"),
+            ]))
+        return _mock_resp(_rdf_xml([
+            ("Climate summit update", "https://www.dw.com/climate"),
+        ]))
+
+    mock_get.side_effect = get_feed
+
+    assert get_digest() == [{
+        "title": "Climate summit report",
+        "sources": ["Al Jazeera", "DW"],
+        "urls": ["https://www.aljazeera.com/climate", "https://www.dw.com/climate"],
+    }]
+    assert mock_fetch_article.call_count == 2
+
+
+@patch("searcher.fetch_article")
+@patch("searcher.httpx.get", side_effect=RuntimeError("all feeds unavailable"))
+def test_get_digest_broad_feed_failure_returns_empty(mock_get, mock_fetch_article):
+    assert get_digest() == []
+    assert mock_get.call_count == 3
+    mock_fetch_article.assert_not_called()
+
+
+@patch("searcher.fetch_article")
+@patch("searcher.httpx.get")
+def test_get_digest_cap_applies_after_fetchability_filtering(mock_get, mock_fetch_article):
+    topics = [
+        "alpha economy",
+        "bravo markets",
+        "charlie politics",
+        "delta climate",
+        "echo health",
+        "foxtrot science",
+    ]
+    mock_get.side_effect = _make_get_side_effect(
+        npr_items=[
+            (f"{topic} update", f"https://www.npr.org/{index}")
+            for index, topic in enumerate(topics)
+        ],
+        aj_items=[
+            (f"{topic} report", f"https://www.aljazeera.com/{index}")
+            for index, topic in enumerate(topics)
+        ],
+    )
+
+    def extract(url):
+        if url.endswith("/0"):
+            raise ValueError("first group is not fetchable")
+        return ("source", "article text")
+
+    mock_fetch_article.side_effect = extract
+
+    result = get_digest()
+
+    assert len(result) == 5
+    assert [group["title"] for group in result] == [
+        "bravo markets update",
+        "charlie politics update",
+        "delta climate update",
+        "echo health update",
+        "foxtrot science update",
     ]
 
 

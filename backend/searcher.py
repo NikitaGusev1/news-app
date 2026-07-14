@@ -2,6 +2,8 @@ from concurrent.futures import ThreadPoolExecutor
 import xml.etree.ElementTree as ET
 import httpx
 
+from fetcher import fetch_article
+
 _SOURCES = [
     {
         "label": "NPR",
@@ -106,8 +108,35 @@ def _fetch_all_items() -> list[dict]:
     return [item for items in all_items_lists for item in items]
 
 
+def _filter_fetchable_groups(groups: list[dict]) -> list[dict]:
+    accepted: list[dict] = []
+
+    for group in groups:
+        sources = []
+        urls = []
+
+        for source, url in zip(group["sources"], group["urls"]):
+            try:
+                fetch_article(url)
+            except Exception:
+                continue
+            sources.append(source)
+            urls.append(url)
+
+        if len(urls) >= 2:
+            accepted.append({
+                "title": group["title"],
+                "sources": sources,
+                "urls": urls,
+            })
+            if len(accepted) == _MAX_DIGEST_GROUPS:
+                break
+
+    return accepted
+
+
 def get_digest() -> list[dict]:
-    return _group_articles(_fetch_all_items())[:_MAX_DIGEST_GROUPS]
+    return _filter_fetchable_groups(_group_articles(_fetch_all_items()))
 
 
 def search_articles(query: str) -> list[dict]:
