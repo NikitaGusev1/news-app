@@ -1,7 +1,9 @@
 # News Bias Comparison Tool — Technical Brief
 
 ## What It Is
-A CLI tool that takes multiple URLs covering the same news story, fetches the full article text, and uses an LLM to produce a structured comparison showing what sources agree on, how each one frames the story differently, and what language choices reveal about their bias.
+A news comparison product with a fetchable-digest mobile MVP. The Expo app presents current stories assembled by a FastAPI backend, then fetches and compares the selected story's ordered source URLs with an LLM. It shows what sources agree on, how each frames the story, and what language choices reveal about their bias.
+
+The original Python CLI is preserved and supported as a compatibility path for users who already have URLs to compare.
 
 ---
 
@@ -13,12 +15,31 @@ Rather than producing a single "unbiased summary" (which is itself a biased clai
 ## Stack
 - **Language:** Python 3.11+
 - **Article fetching:** `trafilatura` — handles HTML stripping, boilerplate removal, extracts clean article body text from a URL
-- **LLM:** Anthropic Claude via `anthropic` Python SDK (`claude-opus-4-6`)
-- **No database, no server, no UI** — pure CLI
+- **LLM:** Anthropic Claude via the `anthropic` Python SDK (using the model configured by the shared analyzer)
+- **Backend:** FastAPI — digest, search compatibility, and article analysis APIs
+- **Mobile UI:** React Native with Expo and Expo Router
+- **Testing:** pytest for Python; Jest with `jest-expo` and Testing Library for the app
+- **Persistence:** no database; the digest uses an in-process server-side cache
 
 ---
 
-## Input / Output
+## Mobile MVP Input / Output
+
+**Input:** The app loads the backend's fetchable digest. A user selects a story with at least two usable source URLs; source names and URLs remain aligned and ordered through filtering and navigation.
+
+**Output:** The results screen shows the same four-part comparison used by the CLI, with loading, error, and retry behavior around the backend request.
+
+The primary flow is:
+
+1. Expo home requests `GET /digest`.
+2. The user selects a fetchable story.
+3. Expo Router passes `JSON.stringify(story.urls)` in a route object.
+4. The results screen calls `POST /analyze` with the parsed ordered URLs.
+5. The backend uses the shared fetcher and analyzer and returns the structured sections and request/fetch metadata.
+
+`GET /search` remains available for compatibility, but query search is not the primary product entry point.
+
+## Preserved CLI Input / Output
 
 **Input:** 2–5 URLs passed as CLI arguments
 ```
@@ -53,18 +74,24 @@ FACTS ONLY ONE SOURCE REPORTED
 
 ## Architecture
 
-### 1. Article Fetching
+### 1. Digest Discovery and Caching
+- Backend-local searchers assemble current story candidates from RSS/search inputs
+- Candidate URLs are checked for fetchability before being offered as a comparison
+- Source names and URLs are kept as ordered, aligned pairs
+- `GET /digest` is cached in process on the server to avoid repeating upstream work on every refresh
+
+### 2. Article Fetching
 - Loop over provided URLs
 - Use `trafilatura.fetch_url()` + `trafilatura.extract()` to get clean text
-- Truncate each article to ~4000 chars to manage token costs
+- Truncate each article to 8,000 characters to manage token costs
 - Gracefully skip and report any URL that fails (paywalled, bot-blocked, etc.)
 
-### 2. Prompt Construction
-- Build a single user message containing all article texts, clearly labelled by source URL
+### 3. Prompt Construction
+- Build a single user message containing all article texts, clearly labelled by source domain
 - Send with a strict system prompt (see below)
 - One API call total, not one per article
 
-### 3. LLM System Prompt (key instructions)
+### 4. LLM System Prompt (key instructions)
 ```
 You are a media analysis tool. Given multiple news articles on the same story:
 
@@ -85,10 +112,11 @@ Never use the word "unbiased." Never declare a winner or loser.
 Never editorialize about which source is more trustworthy.
 ```
 
-### 4. Output Rendering
+### 5. Output Rendering
 - Parse LLM response sections by header
-- Print with simple ASCII borders and dividers
-- Show metadata footer: sources fetched / sources provided, model used, token count
+- Render mobile results with React Native components and `StyleSheet`
+- Preserve terminal rendering with ASCII borders and dividers for the CLI
+- Show request/fetch and token metadata where appropriate
 
 ---
 
@@ -101,17 +129,19 @@ Never editorialize about which source is more trustworthy.
 
 ## Environment
 - Requires `ANTHROPIC_API_KEY` set as environment variable
-- Dependencies: `anthropic`, `trafilatura`
-- Install: `pip install anthropic trafilatura`
+- `API_SECRET` optionally gates backend requests
+- The Expo client uses `API_BASE` for the backend origin and `EXPO_PUBLIC_API_SECRET` to match `API_SECRET`
+- A physical device needs an `API_BASE` reachable over the local network; localhost is suitable for web or an iOS simulator
 
 ---
 
 ## What's Explicitly Out of Scope (for now)
-- No UI
 - No database or history
 - No scheduling or automation
-- No RSS/keyword-based fetching — URLs are always provided manually
 - No support for paywalled content
+- No manual URL input in the mobile app (the root CLI still accepts URLs)
+- No search within the already fetched digest
+- No persistent or distributed cache beyond the MVP's in-process server-side cache
 
 ---
 

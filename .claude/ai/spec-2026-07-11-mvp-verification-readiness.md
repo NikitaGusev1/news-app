@@ -27,6 +27,7 @@ Documented commands in `CLAUDE.md`:
 ```bash
 cd backend && python3 -m pytest tests/ -v
 pytest tests/ -v
+cd app && npm test -- --runInBand
 cd backend && ANTHROPIC_API_KEY=your_key uvicorn main:app --reload --port 8000
 ```
 
@@ -41,6 +42,11 @@ npm run web
 ```
 
 There is no documented lint or typecheck script in `app/package.json`.
+
+The product contract referenced in this document has `status: approved`. That is
+the durable UI/product approval record for this DAG, and it predates this final
+verification task. No implementation task in this DAG may begin without that
+approval remaining recorded.
 
 ## Proposed Design
 
@@ -70,13 +76,20 @@ If app tests require a different Jest invocation for Expo, use the project’s w
 
 ### Manual Smoke Checks
 
-With backend running and `ANTHROPIC_API_KEY` configured:
+With backend running, network access available, and `ANTHROPIC_API_KEY`
+configured:
 
 1. `GET /digest` returns a JSON list.
-2. At least one returned story, if present, has two or more URLs.
+2. Every returned story has at least two URLs and at least two sources;
+   `sources[n]` labels `urls[n]`, with both arrays in the same order. An empty
+   list is valid and does not provide evidence for the per-story assertion.
 3. App opens to digest.
 4. Tapping a story opens results.
 5. Results either show the four sections or a clear retryable error.
+
+These checks are credential- and network-dependent. Record each as passed,
+failed, or unavailable for the environment in which the gate runs. An
+unavailable check is not an automated pass and must not be represented as one.
 
 ### Environment Readiness
 
@@ -98,6 +111,44 @@ DAG implementation should leave:
 - any new plans/decompositions under `.claude/ai/`;
 - no stale references claiming manual URL paste/search is MVP.
 
+### `verified-mvp` Output Contract
+
+`verified-mvp` is a behavioral guarantee, not a replacement for test output. It
+is satisfied only when all of the following are true:
+
+- The backend, root CLI, and Expo commands above exit successfully when run from
+  their documented working directories.
+- Those suites use test doubles at the RSS/search, article extraction
+  (`fetch_article`/`fetch_all`), and Anthropic analyzer boundaries, so no live
+  external request is part of an automated pass.
+- Compatibility behavior remains covered: shared root fetcher/analyzer and CLI
+  behavior, `GET /search`, and ordered `POST /analyze` URL handling.
+- Digest filtering and client navigation preserve `sources` and `urls` as
+  aligned, ordered pairs, and the Expo Router route object passes the ordered
+  URL list as `JSON.stringify(story.urls)`.
+- The approved product/UI contract was recorded before DAG implementation.
+- Every manual smoke check that is available passes; every unavailable
+  credential- or network-dependent check is recorded as unavailable rather than
+  silently skipped or counted as passed.
+
+The completion runner executes the three automated commands after this task.
+Its successful results are the automated evidence for this contract. Until that
+runner succeeds, or if any available manual smoke check fails, `verified-mvp`
+must not be reported as satisfied.
+
+### Final Gate Record
+
+- Product/UI approval: recorded by the approved product contract dated
+  2026-07-11, before this verification task.
+- Automated suites: delegated to the required post-session completion runner;
+  no live-service result is inferred by this document.
+- Credential-dependent API smoke: unavailable in this task unless a real
+  `ANTHROPIC_API_KEY` and network access are supplied.
+- Device/simulator app smoke: unavailable in this task unless an interactive
+  Expo target and reachable backend are supplied.
+- Unavailable smoke checks remain release evidence to collect; they are not
+  converted to automated passes.
+
 ## Alternatives Considered
 
 - Add lint/typecheck scripts before MVP: useful, but not required unless implementation changes make tests insufficient.
@@ -110,8 +161,11 @@ DAG implementation should leave:
 - Root CLI tests pass.
 - App tests pass.
 - Test suite does not make live RSS/article/Anthropic calls.
+- Compatibility paths and ordered source/URL pairing remain covered.
 - README/CLAUDE/docs touched by implementation no longer describe manual URL/search as the MVP entry point.
 - Implementation summary records skipped checks when commands are absent.
+- Available manual smoke checks pass, while unavailable credential-dependent
+  checks are explicitly recorded without being counted as passes.
 
 ## Risks and Open Questions
 
