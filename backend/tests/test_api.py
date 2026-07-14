@@ -13,6 +13,13 @@ MOCK_SECTIONS = {
     "FACTS ONLY ONE SOURCE REPORTED": "Unique.",
 }
 MOCK_ANALYZE_RESULT = {"sections": MOCK_SECTIONS, "tokens_used": 300}
+MOCK_DIGEST = [
+    {
+        "title": "A shared story",
+        "sources": ["BBC", "Reuters"],
+        "urls": ["https://bbc.com/story", "https://reuters.com/story"],
+    }
+]
 
 
 def test_analyze_success_returns_200():
@@ -61,6 +68,33 @@ def test_analyze_returns_500_on_unexpected_error():
          patch("main.analyze", side_effect=Exception("unexpected")):
         response = error_client.post("/analyze", json={"urls": ["https://bbc.com", "https://reuters.com"]})
     assert response.status_code == 500
+
+
+def test_digest_returns_populated_list():
+    with patch("main.get_digest", return_value=MOCK_DIGEST):
+        response = client.get("/digest")
+    assert response.status_code == 200
+    assert response.json() == MOCK_DIGEST
+
+
+def test_digest_returns_empty_list():
+    with patch("main.get_digest", return_value=[]):
+        response = client.get("/digest")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_digest_remains_public_when_api_secret_is_configured():
+    with patch("main._API_SECRET", "configured-secret"), \
+         patch("main.get_digest", return_value=MOCK_DIGEST):
+        digest_response = client.get("/digest")
+        analyze_response = client.post(
+            "/analyze",
+            json={"urls": ["https://bbc.com", "https://reuters.com"]},
+        )
+    assert digest_response.status_code == 200
+    assert digest_response.json() == MOCK_DIGEST
+    assert analyze_response.status_code == 401
 
 
 def test_search_returns_results():
