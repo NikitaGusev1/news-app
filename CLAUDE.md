@@ -4,6 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+### Verification
+
+Run the three automated suites independently from the repository root:
+
+```bash
+# Shared root modules and retained CLI
+pytest tests/ -v
+
+# FastAPI backend
+cd backend && python3 -m pytest tests/ -v
+
+# Expo app (Jest with the jest-expo preset)
+cd app && npm test -- --runInBand
+```
+
 ### Backend
 
 ```bash
@@ -38,9 +53,24 @@ pip install anthropic trafilatura rich pytest
 
 # Backend
 pip install fastapi "uvicorn[standard]" httpx
+
+# Expo app
+cd app && npm install
 ```
 
-Requires `ANTHROPIC_API_KEY` set as an environment variable for any live API calls.
+### Environment and local development
+
+- `ANTHROPIC_API_KEY` is required by the backend and root CLI for live Claude analysis.
+- `API_SECRET` is the backend's optional shared API secret. When configured, protected requests must provide the matching secret.
+- `EXPO_PUBLIC_API_SECRET` supplies that shared secret to the Expo client and must match `API_SECRET`. It is bundled into the client, so it is request gating rather than a private credential.
+- `API_BASE` is the Expo client's backend base URL setting. Use a host reachable from the target environment: `http://localhost:8000` for an iOS simulator or web development, and the development machine's LAN address for a physical device. Do not append an endpoint path.
+
+Example local startup:
+
+```bash
+cd backend && ANTHROPIC_API_KEY=your_key API_SECRET=local-secret uvicorn main:app --reload --port 8000
+cd app && API_BASE=http://localhost:8000 EXPO_PUBLIC_API_SECRET=local-secret npm start
+```
 
 ---
 
@@ -55,12 +85,16 @@ news-app/
   news_debias.py    # CLI entry point (argparse + rich output)
   tests/            # Tests for CLI modules
   backend/
-    main.py         # FastAPI app — thin wrapper calling fetch_all() + analyze()
+    main.py         # Thin FastAPI wrapper over shared modules and backend searchers
     conftest.py     # Adds repo root to sys.path for test discovery
     requirements.txt
     tests/
       test_analyzer.py
       test_api.py
+  app/
+    app/            # Expo Router screens: digest home and analysis results
+    components/     # Reusable React Native UI
+    __tests__/      # Jest and Testing Library behavior tests
   docs/
     superpowers/
       specs/        # Approved design specs
@@ -87,11 +121,43 @@ There is no separate copy of these modules inside `backend/` — any changes to 
 - Note: `anthropic.Anthropic()` client is instantiated at module import time
 
 **`backend/main.py`**
-- Single endpoint: `POST /analyze` — accepts `{"urls": [...]}`, calls `fetch_all()` then `analyze()`, returns sections + meta
-- Returns 400 if fewer than 2 articles fetched successfully
-- CORS middleware with `allow_origins=["*"]`
+- Thin FastAPI transport layer over the shared root fetch/analyze modules and backend-local searcher functions
+- `GET /digest` builds the fetchable story digest and caches it server-side for the configured cache lifetime
+- `GET /search` remains available as a compatibility endpoint for query-based discovery
+- `POST /analyze` remains available to fetch and compare an ordered list of article URLs
+- Returns 400 when an analysis request yields fewer than 2 successfully fetched articles
 
-### API response shape
+**Expo app**
+- Expo Router owns navigation between the digest home screen and the results screen
+- The home screen loads `GET /digest`; a story is selectable only when it has enough fetchable sources to compare
+- Story `sources` and `urls` remain aligned, ordered pairs while unusable entries are filtered
+- Navigation uses an Expo Router route object and passes `JSON.stringify(story.urls)` to the results route
+- The results screen parses those URLs and calls `POST /analyze`; it renders loading, failure, retry, and structured analysis states
+- UI uses React Native `StyleSheet`; tests use Jest, `jest-expo`, and behavior-focused Testing Library assertions
+
+### API contracts
+
+#### `GET /digest`
+
+Returns the mobile MVP's curated, fetchable stories. Each story contains display data plus ordered `sources` and `urls` arrays. Those arrays are an aligned contract: `sources[n]` labels `urls[n]`. The client must preserve that relationship when filtering and navigating. Stories with fewer than two usable URLs cannot start an analysis.
+
+Digest generation may use backend-local search providers and article-fetch checks. The response is cached server-side so normal app refreshes do not repeat all upstream work.
+
+#### `GET /search`
+
+The query-based discovery endpoint is retained for compatibility and backend use. It returns discovered source/URL candidates for a supplied query; it is not the primary mobile MVP entry point.
+
+#### `POST /analyze`
+
+Accepts an ordered URL list:
+
+```json
+{
+  "urls": ["https://source-one.example/story", "https://source-two.example/story"]
+}
+```
+
+It calls the shared `fetch_all()` and `analyze()` boundaries and returns:
 
 ```json
 {
@@ -109,6 +175,15 @@ There is no separate copy of these modules inside `backend/` — any changes to 
 }
 ```
 
-### Frontend (not yet built)
+The requested and successfully fetched counts can differ because inaccessible articles are skipped. Automated backend tests mock RSS/search, `fetch_article`, `fetch_all`, and analyzer boundaries; they must not call live services.
 
-A React Native (Expo) app is planned — spec at `docs/superpowers/specs/2026-04-04-react-native-app-design.md`. It will live at `app/` in the repo root and communicate with the backend at `http://localhost:8000`.
+### Supported compatibility paths and deferred scope
+
+The root `news_debias.py` CLI remains supported for direct URL comparisons, and `GET /search` plus `POST /analyze` remain supported API paths. The fetchable digest in the Expo app is the primary MVP route.
+
+The following are deferred beyond this MVP:
+
+- Manual URL entry in the mobile app
+- Search within the already fetched digest
+- Persistent/database-backed or distributed caching (the MVP cache is server-side and in-process)
+- Saved history, scheduling, notifications, and paywall handling
