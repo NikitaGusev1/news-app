@@ -1,7 +1,7 @@
 import React from 'react'
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native'
 
-import DigestScreen from '../app/(app)/index'
+import DigestScreen from '../app/(app)/digest'
 
 const mockPush = jest.fn()
 
@@ -63,11 +63,8 @@ describe('digest home', () => {
 
     await waitFor(() => expect(getByText(STORIES[0].title)).toBeTruthy())
     expect(getByText(STORIES[1].title)).toBeTruthy()
-    expect(getByText('NPR')).toBeTruthy()
-    expect(getByText('Al Jazeera')).toBeTruthy()
-    expect(getByText('DW')).toBeTruthy()
-    expect(getByText('Reuters')).toBeTruthy()
-    expect(getByText('BBC')).toBeTruthy()
+    expect(getByText('NPR · Al Jazeera · DW')).toBeTruthy()
+    expect(getByText('Reuters · BBC')).toBeTruthy()
     expect(global.fetch).toHaveBeenCalledWith(
       'http://localhost:8000/digest',
       expect.objectContaining({ signal: expect.any(AbortSignal) })
@@ -79,7 +76,9 @@ describe('digest home', () => {
 
     const { getByText } = render(<DigestScreen />)
 
-    await waitFor(() => expect(getByText('No stories yet')).toBeTruthy())
+    await waitFor(() =>
+      expect(getByText('No stories in your digest yet.')).toBeTruthy()
+    )
   })
 
   it('shows an error and retries the digest request', async () => {
@@ -89,7 +88,9 @@ describe('digest home', () => {
 
     const { getByText } = render(<DigestScreen />)
 
-    await waitFor(() => expect(getByText('Could not load digest')).toBeTruthy())
+    await waitFor(() =>
+      expect(getByText('Unable to load your digest')).toBeTruthy()
+    )
     fireEvent.press(getByText('Retry'))
 
     await waitFor(() => expect(getByText(STORIES[0].title)).toBeTruthy())

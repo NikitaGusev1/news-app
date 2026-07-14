@@ -12,7 +12,7 @@ import { API_BASE } from '../../constants/api'
 
 export type DigestStory = {
   title: string
-  summary: string
+  summary?: string
   sources: string[]
   urls: string[]
 }
@@ -133,7 +133,9 @@ export default function DigestScreen() {
             ]}
           >
             <Text style={styles.storyTitle}>{item.title}</Text>
-            <Text style={styles.summary}>{item.summary}</Text>
+            {item.summary ? (
+              <Text style={styles.summary}>{item.summary}</Text>
+            ) : null}
             {item.sources.length > 0 && (
               <Text style={styles.sources}>{item.sources.join(' · ')}</Text>
             )}

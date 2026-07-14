@@ -63,13 +63,13 @@ cd app && npm install
 - `ANTHROPIC_API_KEY` is required by the backend and root CLI for live Claude analysis.
 - `API_SECRET` is the backend's optional shared API secret. When configured, protected requests must provide the matching secret.
 - `EXPO_PUBLIC_API_SECRET` supplies that shared secret to the Expo client and must match `API_SECRET`. It is bundled into the client, so it is request gating rather than a private credential.
-- `API_BASE` is the Expo client's backend base URL setting. Use a host reachable from the target environment: `http://localhost:8000` for an iOS simulator or web development, and the development machine's LAN address for a physical device. Do not append an endpoint path.
+- `EXPO_PUBLIC_API_BASE` overrides the Expo client's deployed backend URL. Use a host reachable from the target environment: `http://localhost:8000` for an iOS simulator or web development, and the development machine's LAN address for a physical device. Do not append an endpoint path.
 
 Example local startup:
 
 ```bash
 cd backend && ANTHROPIC_API_KEY=your_key API_SECRET=local-secret uvicorn main:app --reload --port 8000
-cd app && API_BASE=http://localhost:8000 EXPO_PUBLIC_API_SECRET=local-secret npm start
+cd app && EXPO_PUBLIC_API_BASE=http://localhost:8000 EXPO_PUBLIC_API_SECRET=local-secret npm start
 ```
 
 ---

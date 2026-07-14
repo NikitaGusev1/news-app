@@ -13,8 +13,7 @@ _API_SECRET = os.environ.get("API_SECRET")
 
 from analyzer import analyze       # shared modules from repo root (via sys.path)
 from fetcher import fetch_all      # shared modules from repo root (via sys.path)
-from news_debias import get_digest # shared module from repo root (via sys.path)
-from searcher import search_articles  # backend-local module
+from searcher import get_digest, search_articles  # backend-local module
 
 app = FastAPI()
 
